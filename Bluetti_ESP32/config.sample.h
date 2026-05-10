@@ -16,6 +16,13 @@
 
 #define DEVICE_NAME "BLUETTI-MQTT"
 #define BLUETTI_TYPE AC300
+//#define BLUETTI_TARGET_MAC "e0:2e:61:dc:35:1a"
+//#define DEFAULT_BLUETTI_DEVICE_ID "EB3A2510000760625"
+//#define DEFAULT_MQTT_SERVER "iotlocal.lan"
+//#define DEFAULT_MQTT_PORT "1883"
+//#define WIFI_SSID "your-wifi-ssid"
+//#define WIFI_PASSWORD "your-wifi-password"
+#define READ_ONLY_MODE 1
 
 #define BLUETOOTH_QUERY_MESSAGE_DELAY 3000
 

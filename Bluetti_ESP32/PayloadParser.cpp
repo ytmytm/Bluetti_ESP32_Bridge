@@ -3,6 +3,7 @@
 #include "PayloadParser.h"
 #include "BWifi.h"
 
+#include <vector>
 
 uint16_t parse_uint_field(uint8_t data[]) {
   return ((uint16_t)data[0] << 8) | (uint16_t)data[1];
@@ -76,10 +77,10 @@ void parse_bluetooth_data(uint8_t page, uint8_t offset, uint8_t* pData, size_t l
     
                 uint8_t data_start = (2* ((int)bluetti_device_state[i].f_offset - (int)offset)) + HEADER_SIZE;
                 uint8_t data_end = (data_start + 2 * bluetti_device_state[i].f_size);
-                uint8_t data_payload_field[data_end - data_start];
+                std::vector<uint8_t> data_payload_field((data_end - data_start) + 1, 0);
                 
                 int p_index = 0;
-                for (int i=data_start; i<= data_end; i++){
+                for (int i=data_start; i < data_end; i++){
                       data_payload_field[p_index] = pData[i-1];
                       p_index++;
                 }
@@ -87,33 +88,33 @@ void parse_bluetooth_data(uint8_t page, uint8_t offset, uint8_t* pData, size_t l
                 switch (bluetti_device_state[i].f_type){
                  
                   case UINT_FIELD:
-                    publishTopic(bluetti_device_state[i].f_name, String(parse_uint_field(data_payload_field)));
+                    publishTopic(bluetti_device_state[i].f_name, String(parse_uint_field(data_payload_field.data())));
                     break;
     
                   case BOOL_FIELD:
-                    publishTopic(bluetti_device_state[i].f_name, String((int)parse_bool_field(data_payload_field)));
+                    publishTopic(bluetti_device_state[i].f_name, String((int)parse_bool_field(data_payload_field.data())));
                     break;
     
                   case DECIMAL_FIELD:
-                    publishTopic(bluetti_device_state[i].f_name, String(parse_decimal_field(data_payload_field, bluetti_device_state[i].f_scale ), 2) );
+                    publishTopic(bluetti_device_state[i].f_name, String(parse_decimal_field(data_payload_field.data(), bluetti_device_state[i].f_scale ), 2) );
                     break;
     
                   case SN_FIELD:  
                     char sn[16];
-                    sprintf(sn, "%lld", parse_serial_field(data_payload_field));
+                    sprintf(sn, "%lld", parse_serial_field(data_payload_field.data()));
                     publishTopic(bluetti_device_state[i].f_name, String(sn));
                     break;
     
                   case VERSION_FIELD:
-                    publishTopic(bluetti_device_state[i].f_name, String(parse_version_field(data_payload_field),2) );    
+                    publishTopic(bluetti_device_state[i].f_name, String(parse_version_field(data_payload_field.data()),2) );    
                     break;
 
                   case STRING_FIELD:
-                    publishTopic(bluetti_device_state[i].f_name, parse_string_field(data_payload_field));
+                    publishTopic(bluetti_device_state[i].f_name, parse_string_field(data_payload_field.data()));
                     break;
                   // doesn't work yet, not implemented further
                   case ENUM_FIELD:
-                    publishTopic(bluetti_device_state[i].f_name, parse_enum_field(data_payload_field));
+                    publishTopic(bluetti_device_state[i].f_name, parse_enum_field(data_payload_field.data()));
                     break;
                   default:
                     break;

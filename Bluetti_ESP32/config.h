@@ -2,6 +2,10 @@
 #define CONFIG_H
 #include "Arduino.h"
 
+#if __has_include("config.local.h")
+  #include "config.local.h"
+#endif
+
 #define DEBUG                 1
 // Display config section, comment DISPLAYSSD1306 to disable display
 //#define DEBUGDISP 1
@@ -11,10 +15,19 @@
 //Uncomment to toggle display reset on start, required for displays like LoRa TTGO v1.0
 //#define DISPLAY_RST_PORT 16
 
-#define EEPROM_SALT 13374
+#ifndef EEPROM_SALT
+  #define EEPROM_SALT 13374
+#endif
 
-#define DEVICE_NAME "BLUETTI-MQTT"
-#define BLUETTI_TYPE AC300
+#ifndef DEVICE_NAME
+  #define DEVICE_NAME "BLUETTI-MQTT"
+#endif
+#ifndef BLUETTI_TYPE
+  #define BLUETTI_TYPE AC300
+#endif
+#ifndef READ_ONLY_MODE
+  #define READ_ONLY_MODE 1
+#endif
 
 #define BLUETOOTH_QUERY_MESSAGE_DELAY 3000
 #define BLUETOOTH_MAX_RETRIES_BEFORE_REBOOT 10
@@ -34,12 +47,5 @@
 #define DEVICE_STATE_STATUS_UPDATE  2.5 //Was 0.5 in original branc which is half the DEVICE_STATE_UPDATE value, kept the ratio
 #define MSG_VIEWER_ENTRY_COUNT 20 //number of lines for web message viewer
 #define MSG_VIEWER_REFRESH_CYCLE 5 //refresh time for website data in seconds
-
-
-#ifndef BLUETTI_TYPE
-  #define BLUETTI_TYPE AC300
-#endif
-
-
 
 #endif

@@ -47,3 +47,4 @@ build
 ehthumbs.db
 Thumbs.db
 Bluetti_ESP32/config.h
+Bluetti_ESP32/config.local.h

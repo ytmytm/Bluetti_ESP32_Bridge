@@ -284,6 +284,12 @@ String map_command_value(String command_name, String value){
 
 // Callback function
 void callback(char* topic, byte* payload, unsigned int length) {
+#if defined(READ_ONLY_MODE) && READ_ONLY_MODE
+  Serial.print(F("[MQTT] read-only mode: ignoring command topic "));
+  Serial.println(topic);
+  return;
+#endif
+
   payload[length] = '\0';
   String topic_path = String(topic);
   topic_path.toLowerCase();//in case we recieve DC_OUTPUT_ON instead of the expected dc_output_on
@@ -427,7 +433,7 @@ void initMQTT(){
 
     bool connect_result;
     const char connect_id[] = "Bluetti_ESP32";
-    if (settings.mqtt_username) {
+    if (strlen(settings.mqtt_username) > 0) {
         connect_result = client.connect(connect_id, settings.mqtt_username, settings.mqtt_password);
     } else {
         connect_result = client.connect(connect_id);
@@ -437,10 +443,14 @@ void initMQTT(){
         
       Serial.println(F("[MQTT] Connected to MQTT Server... "));
 
+#if defined(READ_ONLY_MODE) && READ_ONLY_MODE
+      Serial.println(F("[MQTT] read-only mode: command subscriptions disabled"));
+#else
       // subscribe to topics for commands
       for (int i=0; i< sizeof(bluetti_device_command)/sizeof(device_field_data_t); i++){
         subscribeTopic(bluetti_device_command[i].f_name);
       }
+#endif
 
       publishDeviceState();
       publishDeviceStateStatus();
