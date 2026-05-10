@@ -2,6 +2,7 @@
 #include "MQTT.h"
 #include "BWifi.h"
 #include "BTooth.h"
+#include "PublishCache.h"
 #include "utils.h"
 #include "display.h"
 #include "config.h"
@@ -16,6 +17,7 @@ unsigned long lastMQTTMessage = 0;
 unsigned long previousDeviceStatePublish = 0;
 unsigned long previousDeviceStateStatusPublish = 0;
 unsigned long previousMqttReconnect = 0;
+PublishCache statePublishCache(AC_CHARGE_MAX_PERCENTAGE + 1);
 
 String map_field_name(enum field_names f_name){
    switch(f_name) {
@@ -339,13 +341,14 @@ void subscribeTopic(enum field_names field_name) {
 void publishTopic(enum field_names field_name, String value){
   char publishTopicBuf[1024];
   ESPBluettiSettings settings = get_esp32_bluetti_settings();
+  String mappedFieldName = map_field_name(field_name);
  
 #ifdef DEBUG
-  Serial.println("[MQTT] publish topic for field: " +  map_field_name(field_name));
+  Serial.println("[MQTT] publish topic for field: " +  mappedFieldName);
 #endif
   
   //sometimes we get empty values / wrong vales - all the time device_type is empty
-  if (map_field_name(field_name) == "device_type" && value.length() < 3){
+  if (mappedFieldName == "device_type" && value.length() < 3){
 
     //Serial.println(F("[MQTT] Error while publishTopic! 'device_type' can't be empty, reboot device)"));
     ESP.restart();
@@ -353,10 +356,17 @@ void publishTopic(enum field_names field_name, String value){
    // btResetStack();
    
   } 
+
+  if (!statePublishCache.shouldPublish(field_name, value.c_str())) {
+    #ifdef DEBUG
+      Serial.println("[MQTT] skipped unchanged state: " + mappedFieldName + " -> " + value);
+    #endif
+    return;
+  }
   
-  sprintf(publishTopicBuf, "bluetti/%s/state/%s", settings.bluetti_device_id, map_field_name(field_name).c_str() ); 
+  sprintf(publishTopicBuf, "bluetti/%s/state/%s", settings.bluetti_device_id, mappedFieldName.c_str() ); 
   if (strlen(settings.mqtt_server) == 0){
-    AddtoMsgView(String(millis()) +": " + map_field_name(field_name) + " -> " + value); 
+    AddtoMsgView(String(millis()) +": " + mappedFieldName + " -> " + value); 
     #ifdef DEBUG
       Serial.println("[MQTT] No MQTT server specified!");
     #endif
@@ -365,15 +375,16 @@ void publishTopic(enum field_names field_name, String value){
     if (!client.publish(publishTopicBuf, value.c_str() )){
       publishErrorCount++;
       #ifdef DEBUG
-        Serial.println("[MQTT] Publish error: " + String(lastMQTTMessage) + ": publish ERROR! " + map_field_name(field_name) + " -> " + value);
+        Serial.println("[MQTT] Publish error: " + String(lastMQTTMessage) + ": publish ERROR! " + mappedFieldName + " -> " + value);
       #endif
-      AddtoMsgView(String(lastMQTTMessage) + ": publish ERROR! " + map_field_name(field_name) + " -> " + value);
+      AddtoMsgView(String(lastMQTTMessage) + ": publish ERROR! " + mappedFieldName + " -> " + value);
+      statePublishCache.reset();
     }
     else{
       #ifdef DEBUG
-        Serial.println("[MQTT] Last Message: " + String(lastMQTTMessage) + ": " + map_field_name(field_name) + " -> " + value);
+        Serial.println("[MQTT] Last Message: " + String(lastMQTTMessage) + ": " + mappedFieldName + " -> " + value);
       #endif
-      AddtoMsgView(String(lastMQTTMessage) + ": " + map_field_name(field_name) + " -> " + value);
+      AddtoMsgView(String(lastMQTTMessage) + ": " + mappedFieldName + " -> " + value);
     }
   }
   
@@ -442,6 +453,7 @@ void initMQTT(){
     if (connect_result) {
         
       Serial.println(F("[MQTT] Connected to MQTT Server... "));
+      statePublishCache.reset();
 
 #if defined(READ_ONLY_MODE) && READ_ONLY_MODE
       Serial.println(F("[MQTT] read-only mode: command subscriptions disabled"));
