@@ -45,6 +45,9 @@ String map_field_name(enum field_names f_name){
       case DC_INPUT_POWER:
         return "dc_input_power";
         break;
+      case DC_INPUT_VOLTAGE:
+        return "dc_input_voltage";
+        break;
       case AC_INPUT_POWER:
         return "ac_input_power";
         break;

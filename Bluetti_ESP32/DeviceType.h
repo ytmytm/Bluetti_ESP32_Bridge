@@ -77,6 +77,7 @@ enum field_names {
   AC_OUTPUT_POWER_MAX,
   AC_OUTPUT_CURRENT_MAX,
   BATTERY_MIN_PERCENTAGE,   // Discharge lower limit
+  DC_INPUT_VOLTAGE,
   AC_CHARGE_MAX_PERCENTAGE  // Percentage to which point battery will be charged with AC
 
 };

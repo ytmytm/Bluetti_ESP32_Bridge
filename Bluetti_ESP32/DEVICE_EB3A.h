@@ -67,7 +67,7 @@ static device_field_data_t bluetti_device_state[] = {
   //{INTERNAL_AC_VOLTAGE,       0x00, 0x47, 1, 1, 0, DECIMAL_FIELD},
   //{INTERNAL_CURRENT_ONE,      0x00, 0x48, 1, 1, 0, DECIMAL_FIELD},
   {AC_INPUT_VOLTAGE,            0x00, 0x4D, 1, 1, 0, DECIMAL_FIELD},
-  {INTERNAL_DC_INPUT_VOLTAGE,   0x00, 0x56, 1, 1, 0, DECIMAL_FIELD},
+  {DC_INPUT_VOLTAGE,            0x00, 0x56, 1, 2, 0, DECIMAL_FIELD},
 
   //Page 0x00 Battery Details
   {PACK_NUM_MAX, 0x00, 0x5B, 1, 0, 0, UINT_FIELD },
