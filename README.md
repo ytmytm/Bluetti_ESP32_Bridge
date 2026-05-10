@@ -11,7 +11,7 @@ This branch adds and changes the following (relative to that baseline):
 | **MQTT** | **`PublishCache`**: state topics are only republished when the value changes (after MQTT connect, all values publish once). **`bluetti/<device_id>/status`**: retained availability (`online` after connect) plus MQTT **LWT** `offline`. |
 | **Home Assistant** | **MQTT discovery**: retained `homeassistant/.../config` payloads for sensors/binary sensors (device class, units, diagnostic category where appropriate). Discovery prefix overridable via `HA_DISCOVERY_PREFIX`. |
 | **Fields** | EB3A **DC input voltage** at the correct scale/topic (`dc_input_voltage`); **pack voltage** (`pack_voltage`, register `0x62`) published when supported. |
-| **Config** | Optional **`config.local.h`** (gitignored) overrides `config.h` defaults so WiFi/MQTT/MAC/device id stay out of git. **`WiFi.setHostname(DEVICE_NAME)`**; optional compile-time **`WIFI_SSID` / `WIFI_PASSWORD`** for fixed WiFi without the portal. |
+| **Config** | **`Bluetti_ESP32/config.h`** and **`config.local.h`** are in **`.gitignore`** so local settings are not committed. `config.h` supplies defaults; optional **`config.local.h`** overrides them (WiFi/MQTT/MAC/device id, etc.). **`WiFi.setHostname(DEVICE_NAME)`**; optional compile-time **`WIFI_SSID` / `WIFI_PASSWORD`** for fixed WiFi without the portal. |
 | **Robustness** | BLE **notify queue**: crypto runs on the main task, not inside the NimBLE notify callback (avoids stack issues). Command/notify queues **reset on BLE reconnect** so decrypted responses stay aligned with poll metadata. Payload parser uses **heap-backed buffers** instead of VLAs. |
 | **Tests** | **PlatformIO `native`** tests for crypto helpers, publish cache, HA discovery JSON shape, and EB3A field/poll tables (`pio test -e native`). |
 
@@ -57,9 +57,9 @@ Join the Discord Server https://discord.gg/fWDSBTCVmB
 
 ### Configuration
 
-Create a copy of `config.sample.h` and name it `config.h` (see `.gitignore`: `config.h` is intentionally not tracked in some setups).
+Copy `Bluetti_ESP32/config.sample.h` to **`Bluetti_ESP32/config.h`** on your machine. In this fork both **`config.h`** and **`config.local.h`** are listed in **`.gitignore`**, so they stay local and are never pushed to git.
 
-Optionally add **`Bluetti_ESP32/config.local.h`** (also gitignored) to override defaults such as `BLUETTI_TYPE`, `DEVICE_NAME`, MQTT server, WiFi credentials, `BLUETTI_TARGET_MAC`, and `READ_ONLY_MODE` without editing tracked files.
+Optionally add **`Bluetti_ESP32/config.local.h`** to override defaults such as `BLUETTI_TYPE`, `DEVICE_NAME`, MQTT server, WiFi credentials, `BLUETTI_TARGET_MAC`, and `READ_ONLY_MODE` without putting secrets in `config.h`.
 
 Change at least the device type to fit your Bluetti device.
 
