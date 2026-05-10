@@ -1,6 +1,8 @@
 #ifndef DEVICE_EB3A_H
 #define DEVICE_EB3A_H
-#include "Arduino.h"
+#if __has_include("Arduino.h")
+  #include "Arduino.h"
+#endif
 
 /* Not implemented yet
 //Need to check which additional functions on EB3A are supported
@@ -73,7 +75,7 @@ static device_field_data_t bluetti_device_state[] = {
   {PACK_NUM_MAX, 0x00, 0x5B, 1, 0, 0, UINT_FIELD },
 
   //Page 0x00 Battery Data 
-  //{PACK_VOLTAGE, 0x00, 0x62, 1, 2 ,0 ,DECIMAL_FIELD},
+  {PACK_VOLTAGE, 0x00, 0x62, 1, 2, 0, DECIMAL_FIELD},
   
 };
 
@@ -99,6 +101,7 @@ static device_field_data_t bluetti_polling_command[] = {
   {FIELD_UNDEFINED, 0x00, 0x30, 0x02 ,0 , 0, TYPE_UNDEFINED},
   {FIELD_UNDEFINED, 0x00, 0x4D, 0x01 ,0 , 0, TYPE_UNDEFINED},
   {FIELD_UNDEFINED, 0x00, 0x56, 0x01 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x62, 0x01 ,0 , 0, TYPE_UNDEFINED},
 };
 
 static device_field_data_t bluetti_logging_command[] = {
