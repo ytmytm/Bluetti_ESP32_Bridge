@@ -28,6 +28,9 @@
 #ifndef READ_ONLY_MODE
   #define READ_ONLY_MODE 1
 #endif
+#ifndef HA_DISCOVERY_PREFIX
+  #define HA_DISCOVERY_PREFIX "homeassistant"
+#endif
 
 #define BLUETOOTH_QUERY_MESSAGE_DELAY 3000
 #define BLUETOOTH_MAX_RETRIES_BEFORE_REBOOT 10

@@ -2,6 +2,7 @@
 #include "MQTT.h"
 #include "BWifi.h"
 #include "BTooth.h"
+#include "HADiscovery.h"
 #include "PublishCache.h"
 #include "utils.h"
 #include "display.h"
@@ -9,6 +10,9 @@
 
 #include <WiFi.h>
 #include <PubSubClient.h>
+
+#define STRINGIFY_HELPER(value) #value
+#define STRINGIFY(value) STRINGIFY_HELPER(value)
 
 WiFiClient mqttClient;  
 PubSubClient client(mqttClient);
@@ -341,6 +345,67 @@ void subscribeTopic(enum field_names field_name) {
 
 }
 
+String mqttAvailabilityTopic(const ESPBluettiSettings& settings) {
+  return "bluetti/" + String(settings.bluetti_device_id) + "/status";
+}
+
+void publishHAAvailability(const ESPBluettiSettings& settings, const char* availability) {
+  String topic = mqttAvailabilityTopic(settings);
+  if (client.publish(topic.c_str(), availability, true)) {
+    #ifdef DEBUG
+      Serial.println("[MQTT] Published HA availability: " + topic + " -> " + availability);
+    #endif
+  } else {
+    publishErrorCount++;
+    #ifdef DEBUG
+      Serial.println("[MQTT] Failed to publish HA availability: " + topic);
+    #endif
+  }
+}
+
+void publishHAConfig(){
+  ESPBluettiSettings settings = get_esp32_bluetti_settings();
+  String model = STRINGIFY(BLUETTI_TYPE);
+  String deviceName = "Bluetti " + model;
+  String deviceIdentifier = String(settings.bluetti_device_id);
+
+#ifdef BLUETTI_TARGET_MAC
+  String macAddress = BLUETTI_TARGET_MAC;
+#else
+  String macAddress = "";
+#endif
+
+  HADiscoveryDevice device = {
+    deviceIdentifier.c_str(),
+    deviceName.c_str(),
+    model.c_str(),
+    macAddress.c_str()
+  };
+
+  for (int i = 0; i < sizeof(bluetti_device_state) / sizeof(device_field_data_t); i++) {
+    std::string topic = ha_discovery_config_topic(
+        HA_DISCOVERY_PREFIX,
+        settings.bluetti_device_id,
+        bluetti_device_state[i].f_name);
+    std::string payload = ha_discovery_payload(
+        device,
+        settings.bluetti_device_id,
+        bluetti_device_state[i].f_name);
+
+    if (!client.publish(topic.c_str(), payload.c_str(), true)) {
+      publishErrorCount++;
+      #ifdef DEBUG
+        Serial.println("[MQTT] HA discovery publish error: " + String(topic.c_str()));
+      #endif
+    } else {
+      lastMQTTMessage = millis();
+      #ifdef DEBUG
+        Serial.println("[MQTT] Published HA discovery: " + String(topic.c_str()));
+      #endif
+    }
+  }
+}
+
 void publishTopic(enum field_names field_name, String value){
   char publishTopicBuf[1024];
   ESPBluettiSettings settings = get_esp32_bluetti_settings();
@@ -444,19 +509,31 @@ void initMQTT(){
     
     client.setServer(settings.mqtt_server, atoi(settings.mqtt_port));
     client.setCallback(callback);
+    client.setBufferSize(2048);
+
+    String availabilityTopic = mqttAvailabilityTopic(settings);
 
     bool connect_result;
     const char connect_id[] = "Bluetti_ESP32";
     if (strlen(settings.mqtt_username) > 0) {
-        connect_result = client.connect(connect_id, settings.mqtt_username, settings.mqtt_password);
+        connect_result = client.connect(
+          connect_id,
+          settings.mqtt_username,
+          settings.mqtt_password,
+          availabilityTopic.c_str(),
+          0,
+          true,
+          "offline");
     } else {
-        connect_result = client.connect(connect_id);
+        connect_result = client.connect(connect_id, availabilityTopic.c_str(), 0, true, "offline");
     }
     
     if (connect_result) {
         
       Serial.println(F("[MQTT] Connected to MQTT Server... "));
       statePublishCache.reset();
+      publishHAAvailability(settings, "online");
+      publishHAConfig();
 
 #if defined(READ_ONLY_MODE) && READ_ONLY_MODE
       Serial.println(F("[MQTT] read-only mode: command subscriptions disabled"));
