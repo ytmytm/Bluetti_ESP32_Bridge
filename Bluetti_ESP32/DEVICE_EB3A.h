@@ -1,6 +1,8 @@
 #ifndef DEVICE_EB3A_H
 #define DEVICE_EB3A_H
-#include "Arduino.h"
+#if __has_include("Arduino.h")
+  #include "Arduino.h"
+#endif
 
 /* Not implemented yet
 //Need to check which additional functions on EB3A are supported
@@ -67,13 +69,13 @@ static device_field_data_t bluetti_device_state[] = {
   //{INTERNAL_AC_VOLTAGE,       0x00, 0x47, 1, 1, 0, DECIMAL_FIELD},
   //{INTERNAL_CURRENT_ONE,      0x00, 0x48, 1, 1, 0, DECIMAL_FIELD},
   {AC_INPUT_VOLTAGE,            0x00, 0x4D, 1, 1, 0, DECIMAL_FIELD},
-  {INTERNAL_DC_INPUT_VOLTAGE,   0x00, 0x56, 1, 1, 0, DECIMAL_FIELD},
+  {DC_INPUT_VOLTAGE,            0x00, 0x56, 1, 2, 0, DECIMAL_FIELD},
 
   //Page 0x00 Battery Details
   {PACK_NUM_MAX, 0x00, 0x5B, 1, 0, 0, UINT_FIELD },
 
   //Page 0x00 Battery Data 
-  //{PACK_VOLTAGE, 0x00, 0x62, 1, 2 ,0 ,DECIMAL_FIELD},
+  {PACK_VOLTAGE, 0x00, 0x62, 1, 2, 0, DECIMAL_FIELD},
   
 };
 
@@ -90,10 +92,16 @@ static device_field_data_t bluetti_device_command[] = {
 };
 
 static device_field_data_t bluetti_polling_command[] = {
-  {FIELD_UNDEFINED, 0x00, 0x0A, 0x28 ,0 , 0, TYPE_UNDEFINED},
-  {FIELD_UNDEFINED, 0x00, 0x46, 0x15 ,0 , 0, TYPE_UNDEFINED},
-  {FIELD_UNDEFINED, 0x0B, 0xDA, 0x01 ,0 , 0, TYPE_UNDEFINED},
-  {FIELD_UNDEFINED, 0x0B, 0xF4, 0x07 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x0A, 0x0A ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x11, 0x04 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x17, 0x04 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x24, 0x04 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x29, 0x01 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x2B, 0x01 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x30, 0x02 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x4D, 0x01 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x56, 0x01 ,0 , 0, TYPE_UNDEFINED},
+  {FIELD_UNDEFINED, 0x00, 0x62, 0x01 ,0 , 0, TYPE_UNDEFINED},
 };
 
 static device_field_data_t bluetti_logging_command[] = {

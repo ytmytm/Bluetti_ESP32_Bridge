@@ -1,3 +1,22 @@
+## This fork vs. the original project
+
+The upstream ESP32 bridge targets **older Bluetti firmware** that spoke **plaintext** BLE Modbus-style reads. Newer units (including many **EB3A** builds) require an **encrypted BLE session** before register reads work.
+
+This branch adds and changes the following (relative to that baseline):
+
+| Area | What changed |
+|------|----------------|
+| **BLE / protocol** | Full **encryption handshake** (challenge, temporary AES, ECDH P-256, ECDSA-SHA256, secure AES) aligned with the approach used in **hassio-bluetti-bt** / newer Bluetti stacks. Outgoing reads are encrypted; incoming notifications are decrypted before parsing. |
+| **EB3A** | Polling tuned for EB3A register ranges; **read-only** path (no Modbus `0x06` writes / no MQTT command subscriptions when `READ_ONLY_MODE` is set). Optional **`BLUETTI_TARGET_MAC`** for scan matching. |
+| **MQTT** | **`PublishCache`**: state topics are only republished when the value changes (after MQTT connect, all values publish once). **`bluetti/<device_id>/status`**: retained availability (`online` after connect) plus MQTT **LWT** `offline`. |
+| **Home Assistant** | **MQTT discovery**: retained `homeassistant/.../config` payloads for sensors/binary sensors (device class, units, diagnostic category where appropriate). Discovery prefix overridable via `HA_DISCOVERY_PREFIX`. |
+| **Fields** | EB3A **DC input voltage** at the correct scale/topic (`dc_input_voltage`); **pack voltage** (`pack_voltage`, register `0x62`) published when supported. |
+| **Config** | **`Bluetti_ESP32/config.h`** and **`config.local.h`** are in **`.gitignore`** so local settings are not committed. `config.h` supplies defaults; optional **`config.local.h`** overrides them (WiFi/MQTT/MAC/device id, etc.). **`WiFi.setHostname(DEVICE_NAME)`**; optional compile-time **`WIFI_SSID` / `WIFI_PASSWORD`** for fixed WiFi without the portal. |
+| **Robustness** | BLE **notify queue**: crypto runs on the main task, not inside the NimBLE notify callback (avoids stack issues). Command/notify queues **reset on BLE reconnect** so decrypted responses stay aligned with poll metadata. Payload parser uses **heap-backed buffers** instead of VLAs. |
+| **Tests** | **PlatformIO `native`** tests for crypto helpers, publish cache, HA discovery JSON shape, and EB3A field/poll tables (`pio test -e native`). |
+
+If you only need the classic **unencrypted** bridge, use the upstream repository/branch; use **this branch** for **encrypted** Bluetti BLE.
+
 ## About
 This is an ESP32 based Bluetooth to MQTT Bride for BLUETTI power stations. The project is based on https://github.com/warhammerkid/bluetti_mqtt
 The code is tested on a AC300. Other Powerstations should also work but are untested yet. The discussion on https://diysolarforum.com/threads/monitoring-bluetti-systems.37870/ was a great help for understanding the protocol. 
@@ -38,7 +57,10 @@ Join the Discord Server https://discord.gg/fWDSBTCVmB
 
 ### Configuration
 
-Create a copy of config.sample.h and name it config.h
+Copy `Bluetti_ESP32/config.sample.h` to **`Bluetti_ESP32/config.h`** on your machine. In this fork both **`config.h`** and **`config.local.h`** are listed in **`.gitignore`**, so they stay local and are never pushed to git.
+
+Optionally add **`Bluetti_ESP32/config.local.h`** to override defaults such as `BLUETTI_TYPE`, `DEVICE_NAME`, MQTT server, WiFi credentials, `BLUETTI_TARGET_MAC`, and `READ_ONLY_MODE` without putting secrets in `config.h`.
+
 Change at least the device type to fit your Bluetti device.
 
 ### Compiling and Flashing to ESP32
@@ -68,6 +90,12 @@ Finally upload the Sketch to your ESP32.
 *INFO*: Until now only BLUETTI_AC300, BLUETTI_EP500P was tested. If you own one of the supported devices please let me know if it works.
 
 #### PlatformIO
+
+Native unit tests (no hardware):
+
+```
+$ pio test -e native
+```
 
 Compiling
 ```
@@ -131,11 +159,20 @@ States are published to
   * ac_input_power
   * ac_output_power
   * dc_output_power
-  * serial
+  * serial_number
   * dsp_version
   * arm_version
+  * device_type
   * power_generation
   * total_battery_percent
+  * (additional fields depend on `BLUETTI_TYPE` / device table, e.g. `ac_input_voltage`, `dc_input_voltage`, `pack_voltage`, `pack_max_num`)
+
+JSON helpers (not HA state entities):
+
+* `/bluetti/<your_device_id>/state/device` — IP, MAC, uptime
+* `/bluetti/<your_device_id>/state/device_status` — MQTT/BT connected flags
+
+**Home Assistant MQTT discovery** (optional): retained topics under `homeassistant/`; availability on `/bluetti/<your_device_id>/status` (`online` / LWT `offline`).
 
 ## Display
 Config Display:

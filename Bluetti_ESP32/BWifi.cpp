@@ -106,8 +106,26 @@ void initBWifi(bool resetWifi){
                           wrDisp_Status("Setup Wifi");
                         #endif
 	});
+
+  WiFi.setHostname(DEVICE_NAME);
+
+#ifdef WIFI_SSID
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.print(F("Connecting to configured WiFi SSID: "));
+    Serial.println(F(WIFI_SSID));
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    unsigned long wifiConnectStarted = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - wifiConnectStarted < 20000) {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println();
+  }
+#endif
   
-  if (!wifiManager.autoConnect("Bluetti_ESP32")) {
+  if (WiFi.status() != WL_CONNECTED && !wifiManager.autoConnect("Bluetti_ESP32")) {
     ESP.restart();
   }
 
@@ -193,7 +211,7 @@ void initBWifi(bool resetWifi){
   });
   server.addHandler(&events);
 
-  if (!wifiConfig.ota_username) {
+  if (strlen(wifiConfig.ota_username) == 0) {
     ElegantOTA.begin(&server);
   } else {
     ElegantOTA.begin(&server, wifiConfig.ota_username, wifiConfig.ota_password);

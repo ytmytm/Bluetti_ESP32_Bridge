@@ -2,12 +2,17 @@
 #include "MQTT.h"
 #include "BWifi.h"
 #include "BTooth.h"
+#include "HADiscovery.h"
+#include "PublishCache.h"
 #include "utils.h"
 #include "display.h"
 #include "config.h"
 
 #include <WiFi.h>
 #include <PubSubClient.h>
+
+#define STRINGIFY_HELPER(value) #value
+#define STRINGIFY(value) STRINGIFY_HELPER(value)
 
 WiFiClient mqttClient;  
 PubSubClient client(mqttClient);
@@ -16,6 +21,7 @@ unsigned long lastMQTTMessage = 0;
 unsigned long previousDeviceStatePublish = 0;
 unsigned long previousDeviceStateStatusPublish = 0;
 unsigned long previousMqttReconnect = 0;
+PublishCache statePublishCache(AC_CHARGE_MAX_PERCENTAGE + 1);
 
 String map_field_name(enum field_names f_name){
    switch(f_name) {
@@ -42,6 +48,9 @@ String map_field_name(enum field_names f_name){
         break; 
       case DC_INPUT_POWER:
         return "dc_input_power";
+        break;
+      case DC_INPUT_VOLTAGE:
+        return "dc_input_voltage";
         break;
       case AC_INPUT_POWER:
         return "ac_input_power";
@@ -284,6 +293,12 @@ String map_command_value(String command_name, String value){
 
 // Callback function
 void callback(char* topic, byte* payload, unsigned int length) {
+#if defined(READ_ONLY_MODE) && READ_ONLY_MODE
+  Serial.print(F("[MQTT] read-only mode: ignoring command topic "));
+  Serial.println(topic);
+  return;
+#endif
+
   payload[length] = '\0';
   String topic_path = String(topic);
   topic_path.toLowerCase();//in case we recieve DC_OUTPUT_ON instead of the expected dc_output_on
@@ -330,16 +345,78 @@ void subscribeTopic(enum field_names field_name) {
 
 }
 
+String mqttAvailabilityTopic(const ESPBluettiSettings& settings) {
+  return "bluetti/" + String(settings.bluetti_device_id) + "/status";
+}
+
+void publishHAAvailability(const ESPBluettiSettings& settings, const char* availability) {
+  String topic = mqttAvailabilityTopic(settings);
+  if (client.publish(topic.c_str(), availability, true)) {
+    #ifdef DEBUG
+      Serial.println("[MQTT] Published HA availability: " + topic + " -> " + availability);
+    #endif
+  } else {
+    publishErrorCount++;
+    #ifdef DEBUG
+      Serial.println("[MQTT] Failed to publish HA availability: " + topic);
+    #endif
+  }
+}
+
+void publishHAConfig(){
+  ESPBluettiSettings settings = get_esp32_bluetti_settings();
+  String model = STRINGIFY(BLUETTI_TYPE);
+  String deviceName = "Bluetti " + model;
+  String deviceIdentifier = String(settings.bluetti_device_id);
+
+#ifdef BLUETTI_TARGET_MAC
+  String macAddress = BLUETTI_TARGET_MAC;
+#else
+  String macAddress = "";
+#endif
+
+  HADiscoveryDevice device = {
+    deviceIdentifier.c_str(),
+    deviceName.c_str(),
+    model.c_str(),
+    macAddress.c_str()
+  };
+
+  for (int i = 0; i < sizeof(bluetti_device_state) / sizeof(device_field_data_t); i++) {
+    std::string topic = ha_discovery_config_topic(
+        HA_DISCOVERY_PREFIX,
+        settings.bluetti_device_id,
+        bluetti_device_state[i].f_name);
+    std::string payload = ha_discovery_payload(
+        device,
+        settings.bluetti_device_id,
+        bluetti_device_state[i].f_name);
+
+    if (!client.publish(topic.c_str(), payload.c_str(), true)) {
+      publishErrorCount++;
+      #ifdef DEBUG
+        Serial.println("[MQTT] HA discovery publish error: " + String(topic.c_str()));
+      #endif
+    } else {
+      lastMQTTMessage = millis();
+      #ifdef DEBUG
+        Serial.println("[MQTT] Published HA discovery: " + String(topic.c_str()));
+      #endif
+    }
+  }
+}
+
 void publishTopic(enum field_names field_name, String value){
   char publishTopicBuf[1024];
   ESPBluettiSettings settings = get_esp32_bluetti_settings();
+  String mappedFieldName = map_field_name(field_name);
  
 #ifdef DEBUG
-  Serial.println("[MQTT] publish topic for field: " +  map_field_name(field_name));
+  Serial.println("[MQTT] publish topic for field: " +  mappedFieldName);
 #endif
   
   //sometimes we get empty values / wrong vales - all the time device_type is empty
-  if (map_field_name(field_name) == "device_type" && value.length() < 3){
+  if (mappedFieldName == "device_type" && value.length() < 3){
 
     //Serial.println(F("[MQTT] Error while publishTopic! 'device_type' can't be empty, reboot device)"));
     ESP.restart();
@@ -347,10 +424,17 @@ void publishTopic(enum field_names field_name, String value){
    // btResetStack();
    
   } 
+
+  if (!statePublishCache.shouldPublish(field_name, value.c_str())) {
+    #ifdef DEBUG
+      Serial.println("[MQTT] skipped unchanged state: " + mappedFieldName + " -> " + value);
+    #endif
+    return;
+  }
   
-  sprintf(publishTopicBuf, "bluetti/%s/state/%s", settings.bluetti_device_id, map_field_name(field_name).c_str() ); 
+  sprintf(publishTopicBuf, "bluetti/%s/state/%s", settings.bluetti_device_id, mappedFieldName.c_str() ); 
   if (strlen(settings.mqtt_server) == 0){
-    AddtoMsgView(String(millis()) +": " + map_field_name(field_name) + " -> " + value); 
+    AddtoMsgView(String(millis()) +": " + mappedFieldName + " -> " + value); 
     #ifdef DEBUG
       Serial.println("[MQTT] No MQTT server specified!");
     #endif
@@ -359,15 +443,16 @@ void publishTopic(enum field_names field_name, String value){
     if (!client.publish(publishTopicBuf, value.c_str() )){
       publishErrorCount++;
       #ifdef DEBUG
-        Serial.println("[MQTT] Publish error: " + String(lastMQTTMessage) + ": publish ERROR! " + map_field_name(field_name) + " -> " + value);
+        Serial.println("[MQTT] Publish error: " + String(lastMQTTMessage) + ": publish ERROR! " + mappedFieldName + " -> " + value);
       #endif
-      AddtoMsgView(String(lastMQTTMessage) + ": publish ERROR! " + map_field_name(field_name) + " -> " + value);
+      AddtoMsgView(String(lastMQTTMessage) + ": publish ERROR! " + mappedFieldName + " -> " + value);
+      statePublishCache.reset();
     }
     else{
       #ifdef DEBUG
-        Serial.println("[MQTT] Last Message: " + String(lastMQTTMessage) + ": " + map_field_name(field_name) + " -> " + value);
+        Serial.println("[MQTT] Last Message: " + String(lastMQTTMessage) + ": " + mappedFieldName + " -> " + value);
       #endif
-      AddtoMsgView(String(lastMQTTMessage) + ": " + map_field_name(field_name) + " -> " + value);
+      AddtoMsgView(String(lastMQTTMessage) + ": " + mappedFieldName + " -> " + value);
     }
   }
   
@@ -424,23 +509,40 @@ void initMQTT(){
     
     client.setServer(settings.mqtt_server, atoi(settings.mqtt_port));
     client.setCallback(callback);
+    client.setBufferSize(2048);
+
+    String availabilityTopic = mqttAvailabilityTopic(settings);
 
     bool connect_result;
     const char connect_id[] = "Bluetti_ESP32";
-    if (settings.mqtt_username) {
-        connect_result = client.connect(connect_id, settings.mqtt_username, settings.mqtt_password);
+    if (strlen(settings.mqtt_username) > 0) {
+        connect_result = client.connect(
+          connect_id,
+          settings.mqtt_username,
+          settings.mqtt_password,
+          availabilityTopic.c_str(),
+          0,
+          true,
+          "offline");
     } else {
-        connect_result = client.connect(connect_id);
+        connect_result = client.connect(connect_id, availabilityTopic.c_str(), 0, true, "offline");
     }
     
     if (connect_result) {
         
       Serial.println(F("[MQTT] Connected to MQTT Server... "));
+      statePublishCache.reset();
+      publishHAAvailability(settings, "online");
+      publishHAConfig();
 
+#if defined(READ_ONLY_MODE) && READ_ONLY_MODE
+      Serial.println(F("[MQTT] read-only mode: command subscriptions disabled"));
+#else
       // subscribe to topics for commands
       for (int i=0; i< sizeof(bluetti_device_command)/sizeof(device_field_data_t); i++){
         subscribeTopic(bluetti_device_command[i].f_name);
       }
+#endif
 
       publishDeviceState();
       publishDeviceStateStatus();

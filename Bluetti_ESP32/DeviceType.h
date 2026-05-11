@@ -1,6 +1,10 @@
 #ifndef __DEVICE_TYPE_H__
 #define __DEVICE_TYPE_H__
-#include "Arduino.h"
+#if __has_include("Arduino.h")
+  #include "Arduino.h"
+#else
+  #include <stdint.h>
+#endif
 
 enum field_types{
    UINT_FIELD,
@@ -77,6 +81,7 @@ enum field_names {
   AC_OUTPUT_POWER_MAX,
   AC_OUTPUT_CURRENT_MAX,
   BATTERY_MIN_PERCENTAGE,   // Discharge lower limit
+  DC_INPUT_VOLTAGE,
   AC_CHARGE_MAX_PERCENTAGE  // Percentage to which point battery will be charged with AC
 
 };
