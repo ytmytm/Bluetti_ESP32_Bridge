@@ -68,7 +68,8 @@ static device_field_data_t bluetti_device_state[] = {
   //Page 0x00 Details 
   //{INTERNAL_AC_VOLTAGE,       0x00, 0x47, 1, 1, 0, DECIMAL_FIELD},
   //{INTERNAL_CURRENT_ONE,      0x00, 0x48, 1, 1, 0, DECIMAL_FIELD},
-  {AC_INPUT_VOLTAGE,            0x00, 0x4D, 1, 1, 0, DECIMAL_FIELD},
+  // EB3A reports AC input voltage as whole volts (e.g. 0x00ED -> 237 V), not 0.1 V units.
+  {AC_INPUT_VOLTAGE,            0x00, 0x4D, 1, 0, 0, DECIMAL_FIELD},
   {DC_INPUT_VOLTAGE,            0x00, 0x56, 1, 2, 0, DECIMAL_FIELD},
 
   //Page 0x00 Battery Details
